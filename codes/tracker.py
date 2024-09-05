@@ -3,10 +3,10 @@ from ultralytics import YOLO
 
 
 # Cargar el modelo entrenado
-model = YOLO('weights.onnx')
+model = YOLO('..\\fotball_map_pass\\models\\weights.onnx')
 
 # Abrir el archivo de video
-cap = cv2.VideoCapture('corte pov 2.mp4')
+cap = cv2.VideoCapture('..\\fotball_map_pass\\videos\\corte pov 2.mp4')
 
 # Configurar el tamaño de entrada (asumiendo 1792x1792 según tu configuración anterior)
 target_size = (1792, 1792)
