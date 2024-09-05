@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['BALON', 'JUGADOR']
+
+roboflow:
+  workspace: tesis-9u7is
+  project: dataset-2-ki1wy
+  version: 1
+  license: Private
+  url: https://app.roboflow.com/tesis-9u7is/dataset-2-ki1wy/1
