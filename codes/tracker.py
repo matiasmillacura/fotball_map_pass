@@ -1,19 +1,42 @@
 import cv2
+import numpy as np
+from pathlib import Path
+from boxmot import BoTSORT
 from ultralytics import YOLO
 
+# Ajustar la dimensión de la imagen antes de pasarla al modelo
+expected_width = 1792
+expected_height = 1792
 
-# Cargar el modelo entrenado
-model = YOLO('..\\fotball_map_pass\\models\\weights.onnx')
+# Ruta al modelo YOLO entrenado (puedes cambiarlo por otro modelo si lo deseas)
+yolo_model_path = '..\\fotball_map_pass\\models\\weights.onnx'
+yolo_model = YOLO(yolo_model_path)
 
-# Abrir el archivo de video
-cap = cv2.VideoCapture('..\\fotball_map_pass\\videos\\corte pov 2.mp4')
+# Cargar el modelo de ReID
+reid_model_path = Path('resnet50_fc512_msmt17.pt')
 
-# Configurar el tamaño de entrada (asumiendo 1792x1792 según tu configuración anterior)
-target_size = (1792, 1792)
+# Inicializar el tracker BotSORT con ReID
+tracker = BoTSORT(
+    reid_weights=reid_model_path,  # Modelo de ReID
+    device='cpu',                  # Usa 'cuda' si tienes GPU, 'cpu' si no
+    half=False,                     # Usa 'half' si deseas operaciones en FP16
+    track_low_thresh=0.4,
+    new_track_thresh=0.8,
+    track_buffer=1000,              # Aumentar el tiempo de vida de las pistas
+    match_thresh=0.8,             # Umbral de coincidencia en la asociación
+    proximity_thresh=0.7,         # Tolerancia en IoU para la primera asociación
+    appearance_thresh=0.3,        # Umbral de coincidencia de características visuales
+    frame_rate=59.94,                # Tasa de cuadros del video
+    fuse_first_associate=True,    # Fusionar apariencia y movimiento en la primera asociación
+    with_reid=True                # Activar ReID para evitar pérdida de IDs       
+)
 
-# Abrir el archivo de texto para guardar las detecciones
-with open('detecciones.txt', 'w') as f:
-    
+# Ruta al video que deseas procesar
+video_path = '..\\fotball_map_pass\\videos\\corte pov 2.mp4'
+cap = cv2.VideoCapture(video_path)
+
+# Abrir el archivo de texto para guardar las detecciones y seguimientos
+with open('detecciones_y_seguimiento.txt', 'w') as f:
     frame_count = 0  # Contador de fotogramas
 
     while cap.isOpened():
@@ -21,55 +44,44 @@ with open('detecciones.txt', 'w') as f:
         if not ret:
             break
 
-        # Redimensionar el fotograma al tamaño esperado por el modelo
-        resized_frame = cv2.resize(frame, target_size)
+        # Redimensionar la imagen al tamaño esperado por el modelo
+        resized_frame = cv2.resize(frame, (expected_width, expected_height))
 
-        # Asegurarse de que el fotograma tenga 3 canales (RGB) si es necesario
-        if resized_frame.shape[2] != 3:
-            resized_frame = cv2.cvtColor(resized_frame, cv2.COLOR_GRAY2RGB)
+        # Realizar detecciones con YOLOv8
+        results = yolo_model.predict(source=resized_frame, imgsz=(expected_width, expected_height))
 
-        # Hacer la detección con YOLO y ByteTrack (en este caso usando BoTSORT)
-        results = model.track(source=resized_frame,iou=0.5,conf=0.4, imgsz=target_size, tracker="A:\\ultralytics\\ultralytics\\cfg\\trackers\\botsort.yaml", persist=True)
-
-        # Escribir los resultados de detección en el archivo .txt
-        f.write(f"Frame {frame_count}:\n")
-        for result in results:
-            for box in result.boxes:
-                # Obtener las coordenadas de la caja y la confianza
-                xyxy = box.xyxy[0].cpu().numpy()  # Coordenadas [x1, y1, x2, y2]
-                score = box.conf[0].cpu().numpy()  # Confianza
-                class_id = box.cls[0].cpu().numpy()  # Clase (jugador o balón)
-                
-                # Asignar nombres de clase
-                class_name = "JUGADOR" if class_id == 1 else "BALON"
-
-                # Formatear las coordenadas y confianza
-                f.write(f"  Clase: {class_name}, Confianza: {score:.2f}, Coordenadas: ({xyxy[0]:.2f}, {xyxy[1]:.2f}, {xyxy[2]:.2f}, {xyxy[3]:.2f})\n")
-
-        # Dibujar las anotaciones con texto pequeño sin usar `result.plot()`
-        font_scale = 0.5  # Escala de la fuente (más pequeño)
-        thickness = 1  # Grosor del texto
-        color = (255, 0, 0)  # Color del texto (azul)
-
-        # Dibujar las cajas delimitadoras y la ID manualmente
+        # Procesar detecciones para el tracker BotSORT
+        detections = []
         for result in results:
             for box in result.boxes:
                 xyxy = box.xyxy[0].cpu().numpy()  # Coordenadas [x1, y1, x2, y2]
-                track_id = box.id  # ID del seguimiento (si está disponible)
-                x1, y1, x2, y2 = map(int, xyxy)  # Convertir a enteros
+                conf = box.conf[0].cpu().numpy()  # Confianza
+                cls = int(box.cls[0].cpu().numpy())  # Clase (jugador o balón)
+                detections.append([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf, cls])
 
-                # Dibujar caja delimitadora
-                cv2.rectangle(resized_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        if len(detections) > 0:
+            # Convertir las detecciones en un formato compatible con BoTSORT
+            dets = np.array(detections)
 
-                # Dibujar la ID encima de la caja con texto más pequeño
-                if track_id is not None:
-                    cv2.putText(resized_frame, f"ID: {int(track_id)}", (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
+            # Actualizar el tracker con las detecciones
+            tracks = tracker.update(dets, resized_frame)
 
-        # Mostrar el fotograma procesado en tiempo real
-        cv2.imshow("Real-Time Detection", resized_frame)
+            # Escribir las detecciones y seguimientos en el archivo de texto
+            f.write(f"Frame {frame_count}:\n")
+            for track in tracks:
+                track_id = track[4]  # ID del objeto
+                x1, y1, x2, y2 = track[:4]
+                class_name = "JUGADOR" if int(track[5]) == 1 else "BALON"
+                f.write(f"  ID: {track_id}, Clase: {class_name}, Coordenadas: ({x1}, {y1}, {x2}, {y2})\n")
 
-        # Romper el bucle si se presiona la tecla 'q'
+                # Dibujar las cajas de seguimiento y sus IDs
+                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                cv2.putText(frame, f'ID: {track_id}', (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+        # Mostrar el video con el seguimiento
+        cv2.imshow('Tracking con BotSORT', frame)
+
+        # Salir con la tecla 'q'
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
