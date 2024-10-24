@@ -1,180 +1,122 @@
-import numpy as np
-import cv2 as cv
+from tqdm import tqdm
+import supervision as sv
 from ultralytics import YOLO
+import numpy as np
+import cv2
+from configs.soccer import SoccerPitchConfiguration
+from configs.drawing import draw_pitch, draw_points_on_pitch
+from configs.view_transformer import ViewTransformer
+from inference import get_model
 
-# Cargar el modelo YOLO entrenado
-model = YOLO('..\\fotball_map_pass\\models\\weights.onnx')
 
-drawing = False  # true if mouse is pressed
-src_x, src_y = -1, -1
-dst_x, dst_y = -1, -1
 
-src_list = []
-dst_list = []
+# Ruta del modelo y del video
+PLAYER_DETECTION_MODEL = YOLO("C:\\Users\\Matias\\Documents\\GitHub\\fotball_map_pass\\models\\weights.onnx")
+# Configuración del modelo de detección de cancha
+PITCH_DETECTION_MODEL_ID = "pitch-c3e9w/5"
+PITCH_DETECTION_MODEL = get_model(PITCH_DETECTION_MODEL_ID, "49fMB8oQq6GxbnlRsfVd")
 
-# Configurar el tamaño de entrada (asumiendo 1792x1792 según tu configuración anterior)
-target_size = (1792, 1792)
 
-# mouse callback function para src (imagen capturada del video)
-def select_points_src(event, x, y, flags, param):
-    global src_x, src_y, drawing
-    if event == cv.EVENT_LBUTTONDOWN:
-        drawing = True
-        src_x, src_y = x, y
-        cv.circle(src_copy, (x, y), 5, (0, 0, 255), -1)  # Color de los puntos de referencia
-    elif event == cv.EVENT_LBUTTONUP:
-        drawing = False
 
-# mouse callback function para dst (cancha virtualizada)
-def select_points_dst(event, x, y, flags, param):
-    global dst_x, dst_y, drawing
-    if event == cv.EVENT_LBUTTONDOWN:
-        drawing = True
-        dst_x, dst_y = x, y
-        cv.circle(dst_copy, (x, y), 5, (0, 0, 255), -1)  # Color de los puntos de referencia
-    elif event == cv.EVENT_LBUTTONUP:
-        drawing = False
+SOURCE_VIDEO_PATH = "A:\\sports\\sports\\pov1_definitivo_og.mp4"
+TARGET_VIDEO_PATH = "A:\\sports\\sports\\pov1_definitivo_og_resultado.mp4"
 
-def normalize_points(points, shape):
-    """Normaliza los puntos a las dimensiones de la imagen."""
-    height, width = shape[:2]
-    return np.array([[x / width, y / height] for (x, y) in points])
 
-def get_plan_view(src, dst):
-    # Asegurarse de que las dimensiones sean correctas
-    print(f"Dimensiones de src: {src.shape}, Dimensiones de dst: {dst.shape}")
-    
-    # Calcular la homografía usando los puntos seleccionados
-    src_pts = np.array(src_list).reshape(-1,1,2)
-    dst_pts = np.array(dst_list).reshape(-1,1,2)
-    
-    # Imprimir puntos para ver si están bien seleccionados
-    print(f"Puntos de src: {src_pts}, Puntos de dst: {dst_pts}")
-    
-    H, mask = cv.findHomography(src_pts, dst_pts, cv.RANSAC,5.0)
-    print("Matriz de homografía H:")
-    print(H)
-    
-    plan_view = cv.warpPerspective(src, H, (dst.shape[1], dst.shape[0]))
-    return plan_view, H  # Retornar ambos valores: la imagen proyectada (plan_view) y la homografía (H)
+# Configuración de la cancha virtualizada
+CONFIG = SoccerPitchConfiguration()
 
-def transform_detections(detections, H, src_shape):
-    """Transforma las coordenadas de las detecciones utilizando la homografía."""
-    transformed_detections = []
-    height, width = src_shape[:2]
 
-    for detection in detections:
-        x1, y1, x2, y2 = detection[:4]  # Coordenadas de la detección
-        class_id = detection[4]  # Identificar si es jugador o balón
-        
-        # Obtener el centro de la detección
-        center_x = (x1 + x2) / 2
-        center_y = (y1 + y2) / 2
-        
-        # Ajustar las coordenadas para que correspondan al tamaño de la imagen original
-        point = np.array([[center_x, center_y]], dtype='float32').reshape(-1, 1, 2)
-        
-        # Aplicar la homografía
-        transformed_point = cv.perspectiveTransform(point, H)
+# Configurar el VideoCapture de OpenCV
+cap = cv2.VideoCapture(SOURCE_VIDEO_PATH)
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        # Imprimir las coordenadas transformadas
-        print(f"Detección original: {center_x}, {center_y} -> Proyectado: {transformed_point}")
-        
-        transformed_detections.append((transformed_point[0][0], class_id))  # Guardar coordenadas transformadas y la clase
-    return transformed_detections
 
-def draw_detections_on_field(detections, field_img):
-    """Dibuja las detecciones en la cancha virtualizada."""
-    for point, class_id in detections:
-        x, y = point
-        # Dibujar la pelota en rojo y los jugadores en verde
-        if class_id == 0:  # Asumiendo que la clase 0 es la pelota
-            cv.circle(field_img, (int(x), int(y)), 5, (0, 0, 255), -1)  # Rojo para la pelota
-        else:
-            cv.circle(field_img, (int(x), int(y)), 5, (0, 255, 0), -1)  # Verde para jugadores
-    return field_img
-
-# Cargar la cancha virtualizada
-dst = cv.imread('..\\fotball_map_pass\\videos\\dst.jpg', -1)
-if dst is None:
-    print("Error al cargar la imagen de la cancha virtualizada.")
-    exit()
-dst_copy = dst.copy()
-
-# Crear las ventanas y setear los callbacks de mouse para ambas imágenes
-cv.namedWindow('dst')
-cv.setMouseCallback('dst', select_points_dst)
-
-# Cargar el video
-cap = cv.VideoCapture('..\\fotball_map_pass\\videos\\pov1.mp4')
-ret, src = cap.read()
+# Detección de puntos clave en la imagen del video para la homografía
+ret, frame = cap.read()
 if not ret:
-    print("Error al cargar el video.")
+    print("No se pudo leer el frame inicial del video.")
+    cap.release()
     exit()
 
-# Capturar un frame para selección de puntos
-src_copy = src.copy()
-cv.namedWindow('src')
-cv.setMouseCallback('src', select_points_src)
+result = PITCH_DETECTION_MODEL.infer(frame, confidence=0.9)[0]
+key_points = sv.KeyPoints.from_inference(result)
+filter = key_points.confidence[0] > 0.95
+frame_reference_points = key_points.xy[0][filter]
+pitch_reference_points = np.array(CONFIG.vertices)[filter]
 
-# Ciclo para seleccionar los puntos y calcular la homografía
-while True:
-    cv.imshow('src', src_copy)
-    cv.imshow('dst', dst_copy)
-    k = cv.waitKey(1) & 0xFF
-    if k == ord('s'):
-        print('save points')
-        src_list.append([src_x, src_y])
-        dst_list.append([dst_x, dst_y])
-        print("src points:")
-        print(src_list)
-        print("dst points:")
-        print(dst_list)
-    elif k == ord('h'):
-        print('create plan view')
-        plan_view, H = get_plan_view(src, dst)  # Obtener la homografía
-        if plan_view is not None:
-            cv.imshow("plan view", plan_view)
-        else:
-            print("No se pudo mostrar la vista planificada.")
-    elif k == ord('d'):
-        # Procesar el video cuadro por cuadro y aplicar detecciones
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            # Realizar detecciones
-            results = model.predict(source=frame, imgsz=target_size)
-            
-            # Obtener las coordenadas de detección (jugadores y balón)
-            detections = []
-            for result in results:
-                for box in result.boxes:
-                    xyxy = box.xyxy[0].cpu().numpy()  # Coordenadas [x1, y1, x2, y2]
-                    class_id = box.cls[0].cpu().numpy()  # Identificar la clase (jugador o balón)
-                    detections.append(np.append(xyxy, class_id))  # Agregar clase al final
+# Crear el objeto ViewTransformer
+view_transformer = ViewTransformer(
+    source=pitch_reference_points,
+    target=frame_reference_points
+)
 
-            # Transformar las detecciones a la cancha virtualizada
-            transformed_detections = transform_detections(detections, H, frame.shape)
+video_info = sv.VideoInfo.from_video_path(SOURCE_VIDEO_PATH)
+video_sink = sv.VideoSink(TARGET_VIDEO_PATH, video_info)
 
-            # Dibujar las detecciones en la cancha virtualizada
-            field_with_detections = draw_detections_on_field(transformed_detections, dst.copy())
-            cv.imshow('Detections on Field', field_with_detections)
 
-            # Mostrar el fotograma con las detecciones
-            frame_with_detections = frame.copy()
-            for box in result.boxes:
-                xyxy = box.xyxy[0].cpu().numpy()
-                cv.rectangle(frame_with_detections, (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3])), (0, 255, 0), 2)
-            cv.imshow('Video with Detections', frame_with_detections)
+# Procesar el video frame por frame y mostrar en tiempo real
+for _ in tqdm(range(total_frames)):
+    ret, frame = cap.read()
+    if not ret:
+        break
+    
+    # Realizar la inferencia
+    detections_result = PLAYER_DETECTION_MODEL.predict(frame, imgsz=1792)[0]
+    boxes = detections_result.boxes.xyxy.cpu().numpy()  # Coordenadas de las cajas
+    scores = detections_result.boxes.conf.cpu().numpy()  # Puntajes de confianza
+    class_ids = detections_result.boxes.cls.cpu().numpy().astype(int)  # IDs de clases
 
-            if cv.waitKey(1) & 0xFF == ord('q'):
-                break
+    # Convertir las detecciones a un formato compatible
+    detections = sv.Detections(
+        xyxy=boxes,
+        confidence=scores,
+        class_id=class_ids
+    )
 
-        cap.release()
+    # Extraer las coordenadas de los objetos detectados
+    ball_detections = detections[detections.class_id == 0]  # Asumiendo que el ID 0 es el balón
+    players_detections = detections[detections.class_id == 1]  # Asumiendo que el ID 1 es jugador
 
-    elif k == 27:  # Tecla 'Esc' para salir
+    # Obtener coordenadas de los centros de detección para el balón y los jugadores
+    frame_ball_xy = ball_detections.get_anchors_coordinates(sv.Position.BOTTOM_CENTER)
+    frame_players_xy = players_detections.get_anchors_coordinates(sv.Position.BOTTOM_CENTER)
+
+    # Transformar estas coordenadas a la cancha 2D
+    pitch_ball_xy = view_transformer.inverse_transform_points(frame_ball_xy)
+    pitch_players_xy = view_transformer.inverse_transform_points(frame_players_xy)
+
+    # Crear una copia del pitch para cada frame
+    pitch_2d_frame = draw_pitch(CONFIG)
+
+    # Dibujar el balón y los jugadores en la cancha 2D
+    pitch_2d_frame = draw_points_on_pitch(
+        config=CONFIG,
+        xy=pitch_ball_xy,
+        face_color=sv.Color.WHITE,
+        edge_color=sv.Color.BLACK,
+        radius=10,
+        pitch=pitch_2d_frame
+    )
+
+    pitch_2d_frame = draw_points_on_pitch(
+        config=CONFIG,
+        xy=pitch_players_xy,
+        face_color=sv.Color.from_hex("00BFFF"),  # Color para el equipo 1
+        edge_color=sv.Color.BLACK,
+        radius=10,
+        pitch=pitch_2d_frame
+    )
+
+    # Mostrar el frame proyectado en tiempo real
+    cv2.imshow("Cancha 2D con Detecciones", pitch_2d_frame)
+
+    # Salir si se presiona la tecla 'q'
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-cv.destroyAllWindows()
+# Liberar recursos
+cap.release()
+cv2.destroyAllWindows()
