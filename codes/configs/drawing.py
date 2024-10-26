@@ -94,21 +94,20 @@ def draw_pitch(
             thickness=-1
         )
 
-    # Añadir números a los nodos en los vértices
-    #for index, vertex in enumerate(config.vertices):
-    #    x, y = int(vertex[0] * scale) + padding, int(vertex[1] * scale) + padding
-    #    cv2.putText(
-    #        img=pitch_image,
-    #        text=str(index + 1),
-    #        org=(x, y),
-    #        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-    #        fontScale=0.5,  # Tamaño del texto
-    #        color=(0, 0, 0),  # Color del texto (Negro)
-    #        thickness=1,
-    #        lineType=cv2.LINE_AA
-    #    )
+    for index, vertex in enumerate(config.vertices):
+        x, y = int(vertex[0] * scale) + padding, int(vertex[1] * scale) + padding
+        cv2.putText(
+            img=pitch_image,
+            text=str(index + 1),
+            org=(x, y),
+            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+            fontScale=0.5,  # Tamaño del texto
+            color=(0, 0, 0),  # Color del texto (Negro)
+            thickness=1,
+            lineType=cv2.LINE_AA
+        )
 
-    return pitch_image
+        return pitch_image
 
 def draw_points_on_pitch(
     config: SoccerPitchConfiguration,

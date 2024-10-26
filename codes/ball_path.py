@@ -15,7 +15,7 @@ Este codigo, describe la trayectoria de la pelota con respecto a las detecciones
 '''
 
 
-SOURCE_VIDEO_PATH =  "..\\fotball_map_pass\\videos\\pov1_definitivo_og.mp4"
+SOURCE_VIDEO_PATH =  "..\\fotball_map_pass\\videos\\video2.mp4"
 # Ruta del modelo y del video
 PLAYER_DETECTION_MODEL = YOLO("..\\fotball_map_pass\\models\\weights.onnx")
 
@@ -70,9 +70,13 @@ for frame in tqdm(frame_generator, total=video_info.total_frames):
     transformer.m = np.mean(np.array(M), axis=0)
 
     frame_ball_xy = ball_detections.get_anchors_coordinates(sv.Position.BOTTOM_CENTER)
-    pitch_ball_xy = transformer.transform_points(points=frame_ball_xy)
 
-    path_raw.append(pitch_ball_xy)
+    # Verificar si hay detecciones válidas antes de transformar
+    if frame_ball_xy is not None and len(frame_ball_xy) > 0:
+        pitch_ball_xy = transformer.transform_points(points=frame_ball_xy)
+        path_raw.append(pitch_ball_xy)
+    else:
+        path_raw.append(np.empty((0, 2), dtype=np.float32))  # Añadir una estructura vacía si no hay detecciones
 
 path = [
     np.empty((0, 2), dtype=np.float32) if coorinates.shape[0] >= 2 else coorinates

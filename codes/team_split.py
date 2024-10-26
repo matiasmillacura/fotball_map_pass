@@ -5,11 +5,12 @@ from more_itertools import chunked
 import numpy as np
 import umap.umap_ as umap
 from sklearn.cluster import KMeans
-
+import supervision as sv
+from ultralytics import YOLO
 
 PLAYER_ID = 1
 STRIDE = 30
-SOURCE_VIDEO_PATH = "/content/corte pov 2.mp4"
+SOURCE_VIDEO_PATH = "..\\fotball_map_pass\\videos\\video2.mp4"
 PLAYER_DETECTION_MODEL = YOLO("..\\fotball_map_pass\\models\\weights.onnx")
 
 def extract_crops(source_video_path: str):
@@ -42,7 +43,7 @@ def extract_crops(source_video_path: str):
 
 crops = extract_crops(SOURCE_VIDEO_PATH)
 
-# sv.plot_images_grid(crops[:100], grid_size = (10,10)) verificar impresion
+sv.plot_images_grid(crops[:100], grid_size = (10,10)) 
 
 
 
@@ -80,4 +81,4 @@ team_0 =[
     if cluster == 1
 ]
 
-# sv.plot_images_grid(team_0[:100], grid_size = (10,10)) visualizar equipo
+sv.plot_images_grid(team_0[:100], grid_size = (10,10)) 

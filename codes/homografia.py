@@ -11,15 +11,15 @@ from inference import get_model
 
 
 # Ruta del modelo y del video
-PLAYER_DETECTION_MODEL = YOLO("C:\\Users\\Matias\\Documents\\GitHub\\fotball_map_pass\\models\\weights.onnx")
+PLAYER_DETECTION_MODEL = YOLO("..\\fotball_map_pass\\models\\weights.onnx")
 # Configuración del modelo de detección de cancha
 PITCH_DETECTION_MODEL_ID = "pitch-c3e9w/5"
 PITCH_DETECTION_MODEL = get_model(PITCH_DETECTION_MODEL_ID, "49fMB8oQq6GxbnlRsfVd")
 
 
 
-SOURCE_VIDEO_PATH = "A:\\sports\\sports\\pov1_definitivo_og.mp4"
-TARGET_VIDEO_PATH = "A:\\sports\\sports\\pov1_definitivo_og_resultado.mp4"
+SOURCE_VIDEO_PATH = "..\\fotball_map_pass\\videos\\video.mp4"
+TARGET_VIDEO_PATH = "..\\fotball_map_pass\\videos\\video.mp4"
 
 
 # Configuración de la cancha virtualizada

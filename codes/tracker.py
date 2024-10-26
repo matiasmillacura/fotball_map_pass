@@ -2,7 +2,7 @@ import supervision as sv
 from ultralytics import YOLO
 from configs.team import TeamClassifier
 
-SOURCE_VIDEO_PATH = "..\\fotball_map_pass\\videos\\pov1_definitivo_og.mp4"
+SOURCE_VIDEO_PATH = "..\\fotball_map_pass\\videos\\video2.mp4"
 BALL_ID = 0
 PLAYER_ID = 1
 PLAYER_DETECTION_MODEL = YOLO("..\\fotball_map_pass\\models\\weights.onnx")

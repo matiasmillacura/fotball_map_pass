@@ -10,7 +10,7 @@ PITCH_DETECTION_MODEL_ID = "pitch-c3e9w/5"
 PITCH_DETECTION_MODEL = get_model(PITCH_DETECTION_MODEL_ID, "49fMB8oQq6GxbnlRsfVd")
 
 
-SOURCE_VIDEO_PATH = "A:\\sports\\sports\\pov1_definitivo_og.mp4"
+SOURCE_VIDEO_PATH =  "..\\fotball_map_pass\\videos\\video.mp4"
 import cv2
 
 class ViewTransformer:
