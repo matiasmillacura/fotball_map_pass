@@ -11,8 +11,6 @@
 - **Homografía del Campo**: Visualización de las detecciones en un campo de fútbol 2D virtual.
 - **Generación de Mapas de Pases**: Automatización para generar mapas de pases a partir de videos de partidos.
 
-# ⚽️ Análisis de Video de Fútbol usando Visión por Computadora 🧠📊
-
 ![Ejemplo del análisis de video](docs/Imagen_programa.png)
 
 
