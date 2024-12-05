@@ -6,6 +6,7 @@ import supervision as sv
 from typing import Optional, List
 
 
+
 def draw_pitch(
     config: SoccerPitchConfiguration,
     background_color: sv.Color = sv.Color(34, 139, 34),
@@ -16,28 +17,26 @@ def draw_pitch(
     scale: float = 0.1
 ) -> np.ndarray:
     """
-    Draws a soccer pitch with specified dimensions, colors, and scale, including node numbers.
+    Draws a soccer pitch with specified dimensions, colors, and scale.
 
-    Dibuja un campo de fútbol con dimensiones, colores y escala específicos, incluidos los números de nodo.
+    Args:
+        config (SoccerPitchConfiguration): Configuration object containing the
+            dimensions and layout of the pitch.
+        background_color (sv.Color, optional): Color of the pitch background.
+            Defaults to sv.Color(34, 139, 34).
+        line_color (sv.Color, optional): Color of the pitch lines.
+            Defaults to sv.Color.WHITE.
+        padding (int, optional): Padding around the pitch in pixels.
+            Defaults to 50.
+        line_thickness (int, optional): Thickness of the pitch lines in pixels.
+            Defaults to 4.
+        point_radius (int, optional): Radius of the penalty spot points in pixels.
+            Defaults to 8.
+        scale (float, optional): Scaling factor for the pitch dimensions.
+            Defaults to 0.1.
 
-    Argumentos:
-        config (SoccerPitchConfiguration): objeto de configuración que contiene el
-            Dimensiones y distribución del terreno de juego.
-        background_color (sv.Color, opcional): Color del fondo del tono.
-            El valor predeterminado es sv.Color(34, 139, 34).
-        line_color (sv.Color, opcional): Color de las líneas de paso.
-            El valor predeterminado es sv.Color.WHITE.
-        padding (int, opcional): relleno alrededor del tono en píxeles.
-            El valor predeterminado es 50.
-        line_thickness (int, opcional): Grosor de las líneas de paso en píxeles.
-            El valor predeterminado es 4.
-        point_radius (int, opcional): Radio de los puntos de penalización en píxeles.
-            El valor predeterminado es 8.
-        escala (flotante, opcional): factor de escala para las dimensiones de paso.
-            El valor predeterminado es 0,1.
-
-    Devoluciones:
-        np.ndarray: Imagen del campo de fútbol.
+    Returns:
+        np.ndarray: Image of the soccer pitch.
     """
     scaled_width = int(config.width * scale)
     scaled_length = int(config.length * scale)
@@ -94,20 +93,8 @@ def draw_pitch(
             thickness=-1
         )
 
-    for index, vertex in enumerate(config.vertices):
-        x, y = int(vertex[0] * scale) + padding, int(vertex[1] * scale) + padding
-        cv2.putText(
-            img=pitch_image,
-            text=str(index + 1),
-            org=(x, y),
-            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-            fontScale=0.5,  # Tamaño del texto
-            color=(0, 0, 0),  # Color del texto (Negro)
-            thickness=1,
-            lineType=cv2.LINE_AA
-        )
+    return pitch_image
 
-        return pitch_image
 
 def draw_points_on_pitch(
     config: SoccerPitchConfiguration,
@@ -121,30 +108,30 @@ def draw_points_on_pitch(
     pitch: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """
-    Dibuja puntos en el campo de fútbol.
+    Draws points on a soccer pitch.
 
-    Argumentos:
-        config (SoccerPitchConfiguration): objeto de configuración que contiene el
-            Dimensiones y distribución del terreno de juego.
-        xy (np.ndarray): conjunto de puntos a dibujar, con cada punto representado por
-            sus coordenadas (x, y).
-        face_color (sv.Color, opcional): Color de las caras de los puntos.
-            El valor predeterminado es sv.Color.RED.
-        edge_color (sv.Color, opcional): Color de los bordes de los puntos.
-            El valor predeterminado es sv.Color.BLACK.
-        radio (int, opcional): Radio de los puntos en píxeles.
-            El valor predeterminado es 10.
-        espesor (int, opcional): espesor de los bordes del punto en píxeles.
-            El valor predeterminado es 2.
-        padding (int, opcional): relleno alrededor del tono en píxeles.
-            El valor predeterminado es 50.
-        escala (flotante, opcional): factor de escala para las dimensiones de paso.
-            El valor predeterminado es 0,1.
-        paso (Opcional[np.ndarray], opcional): imagen de paso existente para dibujar puntos.
-            Si no hay ninguno, se creará una nueva propuesta. El valor predeterminado es Ninguno.
+    Args:
+        config (SoccerPitchConfiguration): Configuration object containing the
+            dimensions and layout of the pitch.
+        xy (np.ndarray): Array of points to be drawn, with each point represented by
+            its (x, y) coordinates.
+        face_color (sv.Color, optional): Color of the point faces.
+            Defaults to sv.Color.RED.
+        edge_color (sv.Color, optional): Color of the point edges.
+            Defaults to sv.Color.BLACK.
+        radius (int, optional): Radius of the points in pixels.
+            Defaults to 10.
+        thickness (int, optional): Thickness of the point edges in pixels.
+            Defaults to 2.
+        padding (int, optional): Padding around the pitch in pixels.
+            Defaults to 50.
+        scale (float, optional): Scaling factor for the pitch dimensions.
+            Defaults to 0.1.
+        pitch (Optional[np.ndarray], optional): Existing pitch image to draw points on.
+            If None, a new pitch will be created. Defaults to None.
 
-    Devoluciones:
-        np.ndarray: Imagen del campo de fútbol con puntos dibujados.
+    Returns:
+        np.ndarray: Image of the soccer pitch with points drawn on it.
     """
     if pitch is None:
         pitch = draw_pitch(
@@ -153,24 +140,11 @@ def draw_points_on_pitch(
             scale=scale
         )
 
-    # Verificar si las coordenadas transformadas son válidas
-    if xy is None or len(xy) == 0:
-        print("Advertencia: No se encontraron coordenadas para proyectar.")
-        return pitch
-
     for point in xy:
-        # Verificar que las coordenadas no sean NaN o valores inválidos
-        if np.isnan(point).any():
-            print("Advertencia: Coordenadas no válidas detectadas:", point)
-            continue
-
-        # Aplicar escalado y ajuste para posicionar los puntos
         scaled_point = (
             int(point[0] * scale) + padding,
             int(point[1] * scale) + padding
         )
-        
-        # Dibujar el punto en la cancha
         cv2.circle(
             img=pitch,
             center=scaled_point,

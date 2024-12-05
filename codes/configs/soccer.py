@@ -53,4 +53,3 @@ class SoccerPitchConfiguration:
         "#FF1493", "#FF1493", "#FF1493", "#FF1493", "#FF1493", 
         "#FF1493", "#FF1493"
     ])
-

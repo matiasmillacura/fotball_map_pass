@@ -1,8 +1,0 @@
-# Ignore virtual environments
-env/
-venv/
-.venv/
-
-# Ignore large binaries from packages
-*.dll
-*.lib
